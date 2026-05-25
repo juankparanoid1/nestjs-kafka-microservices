@@ -1,0 +1,7 @@
+export enum PaymentProvider {
+  STRIPE = 'STRIPE',
+  PAYPAL = 'PAYPAL',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  MERCADO_PAGO = 'MERCADO_PAGO',
+  ADYEN = 'ADYEN',
+}

@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Orders {
+  id          String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String       @map("user_id") @db.Uuid
+  status      String       @db.VarChar(30)
+  totalAmount Decimal      @map("total_amount") @db.Decimal(10, 2)
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @default(now()) @updatedAt @map("updated_at")
+  orderItems  OrderItems[]
+  payments    Payments[]
+
+  @@map("orders")
+}
+
+model OrderItems {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId String  @map("product_id") @db.Uuid
+  quantity  Decimal @db.Decimal(10, 2)
+  price     Decimal @db.Decimal(10, 2)
+  orderId   String  @map("order_id") @db.Uuid
+  order     Orders  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId], name: "idx_order_items_order_id")
+  @@map("order_items")
+}
+
+model Payments {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  orderId              String   @map("order_id") @db.Uuid
+  status               String   @db.VarChar(30)
+  provider             String   @db.VarChar(50)
+  transactionReference String   @map("transaction_reference") @db.VarChar(100)
+  amount               Decimal  @db.Decimal(10, 2)
+  createdAt            DateTime @default(now()) @map("created_at")
+  order                Orders   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId], name: "idx_payments_order_id")
+  @@map("payments")
+}
+
+model Inventory {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  productId         String   @map("product_id") @db.Uuid
+  availableQuantity Int      @map("available_quantity")
+  reservedQuantity  Int      @map("reserved_quantity")
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@unique([productId], name: "unique_product_inventory")
+  @@map("inventory")
+}
+
+model OutboxEvents {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aggregateType String   @map("aggregate_type") @db.VarChar(50)
+  aggregateId   String   @map("aggregate_id") @db.Uuid
+  eventType     String   @map("event_type") @db.VarChar(50)
+  payload       Json
+  processed     Boolean  @default(false)
+  created_at    DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([processed], name: "idx_outbox_processed")
+  @@index([aggregateId], name: "aggregate_id")
+  @@map("outbox_events")
+}
+
+model ProcessedEvents {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  eventId     String   @map("event_id") @db.Uuid
+  serviceName String   @map("service_name") @db.VarChar(50)
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@unique([eventId, serviceName], name: "uq_event_service")
+  @@map("processed_events")
+}
+
+model IdempotencyKeys {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  idempotencyKey String   @map("idempotency_key") @db.VarChar(255)
+  requestHash    String   @map("request_hash") @db.VarChar(255)
+  response       Json
+  created_at     DateTime @default(now()) @map("created_at")
+
+  @@map("idempotency_keys")
+}

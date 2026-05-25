@@ -1,0 +1,83 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model idempotency_keys {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  idempotency_key String   @db.VarChar(255)
+  request_hash    String   @db.VarChar(255)
+  response        Json
+  created_at      DateTime @default(now())
+}
+
+model inventory {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id         String   @unique @db.Uuid
+  available_quantity Int
+  reserved_quantity  Int
+  updated_at         DateTime @default(now())
+}
+
+model order_items {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  product_id String  @db.Uuid
+  quantity   Decimal @db.Decimal(10, 2)
+  price      Decimal @db.Decimal(10, 2)
+  order_id   String  @db.Uuid
+  orders     orders  @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@index([order_id], map: "idx_order_items_order_id")
+}
+
+model orders {
+  id           String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id      String        @db.Uuid
+  status       String        @db.VarChar(30)
+  total_amount Decimal       @db.Decimal(10, 2)
+  created_at   DateTime      @default(now())
+  updated_at   DateTime      @default(now())
+  order_items  order_items[]
+  payments     payments[]
+}
+
+model outbox_events {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aggregate_type String   @db.VarChar(50)
+  aggregate_id   String   @db.Uuid
+  event_type     String   @db.VarChar(50)
+  payload        Json
+  processed      Boolean  @default(false)
+  created_at     DateTime @default(now())
+  updated_at     DateTime @default(now())
+
+  @@index([aggregate_id], map: "aggregate_id")
+  @@index([processed], map: "idx_outbox_processed")
+}
+
+model payments {
+  id                    String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  order_id              String   @db.Uuid
+  status                String   @db.VarChar(30)
+  provider              String   @db.VarChar(50)
+  transaction_reference String   @db.VarChar(100)
+  amount                Decimal  @db.Decimal(10, 2)
+  created_at            DateTime @default(now())
+  orders                orders   @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  @@index([order_id], map: "idx_payments_order_id")
+}
+
+model processed_events {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  event_id     String   @db.Uuid
+  service_name String   @db.VarChar(50)
+  processed_at DateTime @default(now())
+
+  @@unique([event_id, service_name])
+}
